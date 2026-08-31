@@ -13,9 +13,6 @@ type NaverKeyword = {
   compIdx: "낮음" | "중간" | "높음";
 };
 
-const toCount = (value: number | string) =>
-  typeof value === "number" ? value : 0;
-
 function signature(timestamp: string, secretKey: string) {
   return createHmac("sha256", secretKey)
     .update(`${timestamp}.GET.${URI}`)
@@ -58,9 +55,8 @@ export async function GET() {
       results.map((keyword) => [
         keyword.relKeyword,
         {
-          pc: toCount(keyword.monthlyPcQcCnt),
-          mobile: toCount(keyword.monthlyMobileQcCnt),
-          total: toCount(keyword.monthlyPcQcCnt) + toCount(keyword.monthlyMobileQcCnt),
+          pc: keyword.monthlyPcQcCnt,
+          mobile: keyword.monthlyMobileQcCnt,
           competition: keyword.compIdx,
         },
       ]),

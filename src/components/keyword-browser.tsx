@@ -6,8 +6,9 @@ import { categories, keywords, type Category, type Keyword } from "@/data/keywor
 
 const badgeLabels = { hot: "🔥 급상승", highcpc: "💰 고CPC", new: "🆕 신규" };
 const levelLabels = { high: "높음", medium: "중간", low: "낮음" };
-type Metrics = Record<string, { pc: number; mobile: number; total: number; competition: string }>;
+type Metrics = Record<string, { pc: number | string; mobile: number | string; competition: string }>;
 const numberFormat = new Intl.NumberFormat("ko-KR");
+const formatCount = (count: number | string) => typeof count === "number" ? numberFormat.format(count) : count;
 
 function KeywordCard({ keyword, metrics }: { keyword: Keyword; metrics: Metrics }) {
   const metric = metrics[keyword.name];
@@ -24,7 +25,7 @@ function KeywordCard({ keyword, metrics }: { keyword: Keyword; metrics: Metrics 
       </div>
       <p>{keyword.description}</p>
       <dl className="metrics">
-        <div><dt>월간 검색량</dt><dd className={keyword.searchVolume}>{metric ? numberFormat.format(metric.total) : levelLabels[keyword.searchVolume]}</dd></div>
+        <div><dt>월간 검색량</dt><dd className={keyword.searchVolume}>{metric ? `PC ${formatCount(metric.pc)} / 모바일 ${formatCount(metric.mobile)}` : levelLabels[keyword.searchVolume]}</dd></div>
         <div><dt>경쟁도</dt><dd className={keyword.competition}>{metric?.competition ?? levelLabels[keyword.competition]}</dd></div>
       </dl>
     </Link>
