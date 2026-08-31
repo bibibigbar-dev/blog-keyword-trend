@@ -12,6 +12,16 @@
 
 키는 서버의 `/api/keyword-metrics` 경로에서만 사용하며 브라우저에 노출되지 않습니다.
 
+## AI 본문·이미지 생성
+
+키워드 상세 화면에서 제목 템플릿을 클릭하면 `/api/generate-article` 경로가 OpenAI를 호출해 블로그 본문과 추천 이미지 1~2장을 생성합니다. Vercel 환경 변수에 다음 값을 등록해야 합니다.
+
+- `OPENAI_API_KEY` (필수)
+- `OPENAI_TEXT_MODEL` (선택, 기본값 `gpt-4o-mini`)
+- `OPENAI_IMAGE_MODEL` (선택, 기본값 `dall-e-3`)
+
+키는 서버의 `/api/generate-article` 경로에서만 사용하며 브라우저에 노출되지 않습니다.
+
 ## 로컬 실행
 
 Node.js 18.17 이상이 필요합니다.
@@ -30,4 +40,4 @@ npm run lint
 npm run build
 ```
 
-Vercel에서 이 저장소를 Import하면 별도 설정 없이 배포할 수 있습니다.
+Vercel에서 이 저장소를 Import하면 별도 설정 없이 배포할 수 있습니다. 이 프로젝트는 Vercel 배포만 지원하며 별도의 정적 호스팅 워크플로우는 사용하지 않습니다.
