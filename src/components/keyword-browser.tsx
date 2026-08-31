@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { categories, keywords, type Category, type Keyword } from "@/data/keywords";
 
 const badgeLabels = { hot: "🔥 급상승", highcpc: "💰 고CPC", new: "🆕 신규" };
 const levelLabels = { high: "높음", medium: "중간", low: "낮음" };
+type Metrics = Record<string, { pc: number; mobile: number; total: number; competition: string }>;
+const numberFormat = new Intl.NumberFormat("ko-KR");
 
-function KeywordCard({ keyword }: { keyword: Keyword }) {
+function KeywordCard({ keyword, metrics }: { keyword: Keyword; metrics: Metrics }) {
+  const metric = metrics[keyword.name];
+
   return (
     <Link className="keyword-card" href={`/keyword/${keyword.slug}`}>
       <div className="card-topline">
@@ -20,8 +24,8 @@ function KeywordCard({ keyword }: { keyword: Keyword }) {
       </div>
       <p>{keyword.description}</p>
       <dl className="metrics">
-        <div><dt>검색량</dt><dd className={keyword.searchVolume}>{levelLabels[keyword.searchVolume]}</dd></div>
-        <div><dt>경쟁도</dt><dd className={keyword.competition}>{levelLabels[keyword.competition]}</dd></div>
+        <div><dt>월간 검색량</dt><dd className={keyword.searchVolume}>{metric ? numberFormat.format(metric.total) : levelLabels[keyword.searchVolume]}</dd></div>
+        <div><dt>경쟁도</dt><dd className={keyword.competition}>{metric?.competition ?? levelLabels[keyword.competition]}</dd></div>
       </dl>
     </Link>
   );
@@ -29,8 +33,16 @@ function KeywordCard({ keyword }: { keyword: Keyword }) {
 
 export default function KeywordBrowser() {
   const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
+  const [metrics, setMetrics] = useState<Metrics>({});
   const visibleKeywords = activeCategory === "all" ? keywords : keywords.filter((keyword) => keyword.category === activeCategory);
   const topKeywords = keywords.filter((keyword) => keyword.badges.includes("hot")).slice(0, 5);
+
+  useEffect(() => {
+    fetch("/api/keyword-metrics")
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((data: { metrics: Metrics }) => setMetrics(data.metrics))
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -44,7 +56,7 @@ export default function KeywordBrowser() {
       <div className="content-grid">
         <section aria-live="polite">
           <div className="section-heading"><p>EDITOR&apos;S PICK</p><h1>{activeCategory === "all" ? "오늘 주목할 키워드" : `${categories.find((category) => category.id === activeCategory)?.name} 키워드`}</h1></div>
-          <div className="keyword-grid">{visibleKeywords.map((keyword) => <KeywordCard key={keyword.id} keyword={keyword} />)}</div>
+          <div className="keyword-grid">{visibleKeywords.map((keyword) => <KeywordCard key={keyword.id} keyword={keyword} metrics={metrics} />)}</div>
         </section>
         <aside>
           <div className="top-five">
