@@ -8,11 +8,50 @@ const IMAGE_COUNT = 2;
 
 type RequestBody = { slug?: string; title?: string };
 
+class OpenAIRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 function authHeaders(apiKey: string) {
   return {
     "Content-Type": "application/json",
     Authorization: "Bearer " + apiKey,
   };
+}
+
+async function openAIErrorMessage(response: Response, fallback: string) {
+  const data = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return data?.error?.message ?? fallback;
+}
+
+function articleErrorResponse(error: unknown) {
+  if (error instanceof OpenAIRequestError) {
+    if (error.status === 401 || error.status === 403) {
+      return NextResponse.json(
+        { error: "OpenAI API 키가 유효하지 않거나 권한이 없습니다. Vercel의 OPENAI_API_KEY 값을 확인해 주세요." },
+        { status: 502 },
+      );
+    }
+    if (error.status === 429) {
+      return NextResponse.json(
+        { error: "OpenAI 사용량 한도 또는 요청 제한에 걸렸습니다. 결제/쿼터 상태를 확인한 뒤 다시 시도해 주세요." },
+        { status: 502 },
+      );
+    }
+    if (error.status === 400) {
+      return NextResponse.json(
+        { error: `OpenAI 요청 설정을 확인해 주세요. ${error.message}` },
+        { status: 502 },
+      );
+    }
+  }
+
+  return NextResponse.json({ error: "Unable to generate article content." }, { status: 502 });
 }
 
 async function generateContent(apiKey: string, prompt: string) {
@@ -33,7 +72,12 @@ async function generateContent(apiKey: string, prompt: string) {
     }),
   });
 
-  if (!response.ok) throw new Error(`OpenAI chat completion returned ${response.status}`);
+  if (!response.ok) {
+    throw new OpenAIRequestError(
+      await openAIErrorMessage(response, `OpenAI chat completion returned ${response.status}`),
+      response.status,
+    );
+  }
   const data = (await response.json()) as { choices: { message: { content: string } }[] };
   return data.choices[0]?.message?.content?.trim() ?? "";
 }
@@ -51,7 +95,12 @@ async function generateImage(apiKey: string, prompt: string) {
     }),
   });
 
-  if (!response.ok) throw new Error(`OpenAI image generation returned ${response.status}`);
+  if (!response.ok) {
+    throw new OpenAIRequestError(
+      await openAIErrorMessage(response, `OpenAI image generation returned ${response.status}`),
+      response.status,
+    );
+  }
   const data = (await response.json()) as { data: { b64_json: string }[] };
   const b64 = data.data[0]?.b64_json;
   return b64 ? `data:image/png;base64,${b64}` : null;
@@ -108,7 +157,7 @@ export async function POST(request: Request) {
       content,
       images: images.filter((image): image is string => Boolean(image)),
     });
-  } catch {
-    return NextResponse.json({ error: "Unable to generate article content." }, { status: 502 });
+  } catch (error) {
+    return articleErrorResponse(error);
   }
 }

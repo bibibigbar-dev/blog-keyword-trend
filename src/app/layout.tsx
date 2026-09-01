@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CurrentDate from "@/components/current-date";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <header className="site-header">
           <div className="header-inner">
             <Link className="brand" href="/">키워드 <em>트렌드</em></Link>
-            <p>{new Intl.DateTimeFormat("ko-KR", { dateStyle: "long" }).format(new Date())} · 블로그 수익화 인사이트</p>
+            <p><CurrentDate /> · 블로그 수익화 인사이트</p>
           </div>
         </header>
         {children}
