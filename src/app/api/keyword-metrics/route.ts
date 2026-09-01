@@ -25,9 +25,9 @@ async function fetchBatch(names: string[]) {
     `${API_URL}${URI}?hintKeywords=${encodeURIComponent(names.join(","))}&showDetail=1`,
     {
       headers: {
-        "X-API-KEY": process.env.API_KEY!,
-        "X-Customer": process.env.CUSTOMER_ID!,
-        "X-Signature": signature(timestamp, process.env.SECRET_KEY!),
+        "X-API-KEY": process.env.API_KEY!.trim(),
+        "X-Customer": process.env.CUSTOMER_ID!.trim(),
+        "X-Signature": signature(timestamp, process.env.SECRET_KEY!.trim()),
         "X-Timestamp": timestamp,
       },
       next: { revalidate: 3600 },
