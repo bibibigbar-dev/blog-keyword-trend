@@ -13,6 +13,12 @@ type NaverKeyword = {
   compIdx: "낮음" | "중간" | "높음";
 };
 
+const numericCount = (count: number | string) => {
+  if (typeof count === "number") return count;
+  const value = Number(count.replace(/[^0-9]/g, ""));
+  return Number.isFinite(value) ? value : 0;
+};
+
 function signature(timestamp: string, secretKey: string) {
   return createHmac("sha256", secretKey)
     .update(`${timestamp}.GET.${URI}`)
@@ -61,9 +67,19 @@ export async function GET() {
         },
       ]),
     );
+    const ranking = results
+      .filter((keyword) => names.includes(keyword.relKeyword))
+      .sort((a, b) =>
+        numericCount(b.monthlyPcQcCnt) +
+        numericCount(b.monthlyMobileQcCnt) -
+        numericCount(a.monthlyPcQcCnt) -
+        numericCount(a.monthlyMobileQcCnt),
+      )
+      .slice(0, 5)
+      .map((keyword) => keyword.relKeyword);
 
     return NextResponse.json(
-      { metrics, updatedAt: new Date().toISOString() },
+      { metrics, ranking, updatedAt: new Date().toISOString() },
       { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
     );
   } catch {
