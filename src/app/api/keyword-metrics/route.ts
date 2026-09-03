@@ -13,13 +13,19 @@ type NaverKeyword = {
   compIdx: "낮음" | "중간" | "높음";
 };
 
+const numericCount = (count: number | string) => {
+  if (typeof count === "number") return count;
+  const value = Number(count.replace(/[^0-9]/g, ""));
+  return Number.isFinite(value) ? value : 0;
+};
+
 function signature(timestamp: string, secretKey: string) {
   return createHmac("sha256", secretKey)
     .update(`${timestamp}.GET.${URI}`)
     .digest("base64");
 }
 
-async function fetchBatch(names: string[]) {
+async function fetchBatch(names: string[], forceRefresh = false) {
   const timestamp = Date.now().toString();
   const response = await fetch(
     `${API_URL}${URI}?hintKeywords=${encodeURIComponent(names.join(","))}&showDetail=1`,
@@ -30,7 +36,7 @@ async function fetchBatch(names: string[]) {
         "X-Signature": signature(timestamp, process.env.SECRET_KEY!.trim()),
         "X-Timestamp": timestamp,
       },
-      next: { revalidate: 3600 },
+      ...(forceRefresh ? { cache: "no-store" as const } : { next: { revalidate: 3600 } }),
     },
   );
 
@@ -39,18 +45,19 @@ async function fetchBatch(names: string[]) {
   return data.keywordList;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const { API_KEY, SECRET_KEY, CUSTOMER_ID } = process.env;
   if (!API_KEY || !SECRET_KEY || !CUSTOMER_ID) {
     return NextResponse.json({ error: "Naver API credentials are not configured." }, { status: 503 });
   }
 
   try {
+    const forceRefresh = new URL(request.url).searchParams.has("refresh");
     const names = keywords.map((keyword) => keyword.name);
     const batches = Array.from({ length: Math.ceil(names.length / BATCH_SIZE) }, (_, index) =>
       names.slice(index * BATCH_SIZE, (index + 1) * BATCH_SIZE),
     );
-    const results = (await Promise.all(batches.map(fetchBatch))).flat();
+    const results = (await Promise.all(batches.map((batch) => fetchBatch(batch, forceRefresh)))).flat();
     const metrics = Object.fromEntries(
       results.map((keyword) => [
         keyword.relKeyword,
@@ -61,10 +68,20 @@ export async function GET() {
         },
       ]),
     );
+    const ranking = results
+      .filter((keyword) => names.includes(keyword.relKeyword))
+      .sort((a, b) =>
+        numericCount(b.monthlyPcQcCnt) +
+        numericCount(b.monthlyMobileQcCnt) -
+        numericCount(a.monthlyPcQcCnt) -
+        numericCount(a.monthlyMobileQcCnt),
+      )
+      .slice(0, 5)
+      .map((keyword) => keyword.relKeyword);
 
     return NextResponse.json(
-      { metrics, updatedAt: new Date().toISOString() },
-      { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
+      { metrics, ranking, updatedAt: new Date().toISOString() },
+      { headers: { "Cache-Control": forceRefresh ? "no-store" : "public, s-maxage=3600, stale-while-revalidate=86400" } },
     );
   } catch {
     return NextResponse.json({ error: "Unable to retrieve Naver keyword metrics." }, { status: 502 });
