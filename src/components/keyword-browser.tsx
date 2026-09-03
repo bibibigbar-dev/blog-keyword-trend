@@ -56,20 +56,20 @@ export default function KeywordBrowser() {
       </nav>
       <div className="content-grid">
         <section aria-live="polite">
-          <div className="section-heading"><p>EDITOR&apos;S PICK</p><h1>{activeCategory === "all" ? "오늘 주목할 키워드" : `${categories.find((category) => category.id === activeCategory)?.name} 키워드`}</h1></div>
+          <div className="section-heading"><p>EDITOR&apos;S PICK</p><h1>{activeCategory === "all" ? "주목할 키워드" : `${categories.find((category) => category.id === activeCategory)?.name} 키워드`}</h1></div>
           <div className="keyword-grid">{visibleKeywords.map((keyword) => <KeywordCard key={keyword.id} keyword={keyword} metrics={metrics} />)}</div>
         </section>
         <aside>
           <div className="top-five">
-            <p className="eyebrow">TODAY&apos;S RANKING</p>
-            <h2>오늘의 TOP 5</h2>
+            <p className="eyebrow">EDITOR&apos;S RANKING</p>
+            <h2>추천 TOP 5</h2>
             <ol>
               {topKeywords.map((keyword, index) => (
                 <li key={keyword.id}><span>{String(index + 1).padStart(2, "0")}</span><Link href={`/keyword/${keyword.slug}`}>{keyword.name}</Link></li>
               ))}
             </ol>
           </div>
-          <p className="sidebar-note">검색 트렌드와 광고 효율을 바탕으로 큐레이션한 콘텐츠 아이디어입니다.</p>
+          <p className="sidebar-note">키워드 목록과 TOP 5는 편집 큐레이션입니다. 검색량은 네이버 검색광고의 월간 집계라 실시간 순위가 아니며, 날짜가 바뀌어도 목록과 주제가 자동으로 바뀌지 않습니다.</p>
         </aside>
       </div>
     </>
