@@ -28,7 +28,7 @@ function articleErrorResponse(error: unknown) {
 
   return NextResponse.json(
     {
-      error: `OpenAI 시도 후 Claude 대체 생성도 실패했습니다. Render 환경 변수의 OPENAI_API_KEY와 ANTHROPIC_API_KEY 값에 앞뒤 공백이나 줄바꿈이 없는지, 각 키의 권한과 사용량 한도를 확인해 주세요.${detail ? ` (${detail})` : ""}`,
+      error: `OpenAI, GitHub Models, Claude 순서로 모두 시도했지만 본문 생성에 실패했습니다. Render 환경 변수의 OPENAI_API_KEY, GITHUB_MODELS_TOKEN, ANTHROPIC_API_KEY 값에 앞뒤 공백이나 줄바꿈이 없는지, 각 키의 권한과 사용량 한도를 확인해 주세요.${detail ? ` (${detail})` : ""}`,
     },
     { status: 502 },
   );
@@ -59,9 +59,12 @@ async function generateImage(apiKey: string, prompt: string) {
 
 export async function POST(request: Request) {
   const openAIKey = process.env.OPENAI_API_KEY?.trim();
-  if (!openAIKey && !process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!openAIKey && !process.env.GITHUB_MODELS_TOKEN?.trim() && !process.env.ANTHROPIC_API_KEY?.trim()) {
     return NextResponse.json(
-      { error: "AI API 키가 설정되지 않았습니다. OPENAI_API_KEY 또는 ANTHROPIC_API_KEY를 등록해 주세요." },
+      {
+        error:
+          "AI API 키가 설정되지 않았습니다. OPENAI_API_KEY, GITHUB_MODELS_TOKEN, ANTHROPIC_API_KEY 중 하나 이상을 등록해 주세요.",
+      },
       { status: 503 },
     );
   }
