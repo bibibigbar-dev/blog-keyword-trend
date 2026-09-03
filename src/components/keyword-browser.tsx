@@ -45,9 +45,13 @@ export default function KeywordBrowser() {
   const topKeywords = (ranking.length
     ? ranking.map((name) => keywords.find((keyword) => keyword.name === name)).filter((keyword): keyword is Keyword => Boolean(keyword))
     : keywords.filter((keyword) => keyword.badges.includes("hot")).slice(0, 5));
+  const refreshPage = () => {
+    window.location.assign(`${window.location.pathname}?refresh=${Date.now()}`);
+  };
 
   useEffect(() => {
-    fetch("/api/keyword-metrics")
+    const refresh = new URLSearchParams(window.location.search).has("refresh");
+    fetch(`/api/keyword-metrics${refresh ? `?refresh=${Date.now()}` : ""}`, refresh ? { cache: "no-store" } : undefined)
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then((data: MetricsResponse) => {
         setMetrics(data.metrics);
@@ -72,6 +76,7 @@ export default function KeywordBrowser() {
           <div className="keyword-grid">{visibleKeywords.map((keyword) => <KeywordCard key={keyword.id} keyword={keyword} metrics={metrics} />)}</div>
         </section>
         <aside>
+          <button type="button" className="refresh-button" onClick={refreshPage}>↻ 전체 내용 새로고침</button>
           <div className="top-five">
             <p className="eyebrow">EDITOR&apos;S RANKING</p>
             <h2>검색량 기준 TOP 5</h2>
