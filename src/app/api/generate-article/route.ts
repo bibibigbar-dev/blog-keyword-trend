@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
 import { categories, getKeywordBySlug } from "@/data/keywords";
+import { generateTextWithFallback } from "@/lib/ai-text";
 
 const OPENAI_URL = "https://api.openai.com/v1";
-const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini";
 const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
 const IMAGE_COUNT = 2;
 
-type RequestBody = { slug?: string; title?: string };
+const ARTICLE_SYSTEM_PROMPT =
+  "당신은 SEO에 능숙한 한국어 블로그 작가입니다. 마크다운 기호(#, *, -) 없이 순수 텍스트로만 작성하고, 문단 사이는 빈 줄로 구분하세요. 소제목이 필요하면 문장 끝에 콜론(:)을 붙여 표현하세요.";
 
-class OpenAIRequestError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-  }
-}
+type RequestBody = { slug?: string; title?: string };
 
 function authHeaders(apiKey: string) {
   return {
@@ -30,58 +24,14 @@ async function openAIErrorMessage(response: Response, fallback: string) {
 }
 
 function articleErrorResponse(error: unknown) {
-  if (error instanceof OpenAIRequestError) {
-    if (error.status === 401 || error.status === 403) {
-      return NextResponse.json(
-        {
-          error: `OpenAI API 키가 유효하지 않거나 권한이 없습니다. 배포 환경의 OPENAI_API_KEY 값에 앞뒤 공백이나 줄바꿈이 포함되지 않았는지, 그리고 해당 키에 필요한 권한(모델/이미지 생성)이 있는지 확인해 주세요. (${error.message})`,
-        },
-        { status: 502 },
-      );
-    }
-    if (error.status === 429) {
-      return NextResponse.json(
-        { error: "OpenAI 사용량 한도 또는 요청 제한에 걸렸습니다. 결제/쿼터 상태를 확인한 뒤 다시 시도해 주세요." },
-        { status: 502 },
-      );
-    }
-    if (error.status === 400) {
-      return NextResponse.json(
-        { error: `OpenAI 요청 설정을 확인해 주세요. ${error.message}` },
-        { status: 502 },
-      );
-    }
-  }
+  const detail = error instanceof Error ? error.message : "";
 
-  return NextResponse.json({ error: "Unable to generate article content." }, { status: 502 });
-}
-
-async function generateContent(apiKey: string, prompt: string) {
-  const response = await fetch(`${OPENAI_URL}/chat/completions`, {
-    method: "POST",
-    headers: authHeaders(apiKey),
-    body: JSON.stringify({
-      model: TEXT_MODEL,
-      temperature: 0.7,
-      messages: [
-        {
-          role: "system",
-          content:
-            "당신은 SEO에 능숙한 한국어 블로그 작가입니다. 마크다운 기호(#, *, -) 없이 순수 텍스트로만 작성하고, 문단 사이는 빈 줄로 구분하세요. 소제목이 필요하면 문장 끝에 콜론(:)을 붙여 표현하세요.",
-        },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new OpenAIRequestError(
-      await openAIErrorMessage(response, `OpenAI chat completion returned ${response.status}`),
-      response.status,
-    );
-  }
-  const data = (await response.json()) as { choices: { message: { content: string } }[] };
-  return data.choices[0]?.message?.content?.trim() ?? "";
+  return NextResponse.json(
+    {
+      error: `OpenAI, GitHub Models, Claude 순서로 모두 시도했지만 본문 생성에 실패했습니다. Render 환경 변수의 OPENAI_API_KEY, GITHUB_MODELS_TOKEN, ANTHROPIC_API_KEY 값에 앞뒤 공백이나 줄바꿈이 없는지, 각 키의 권한과 사용량 한도를 확인해 주세요.${detail ? ` (${detail})` : ""}`,
+    },
+    { status: 502 },
+  );
 }
 
 async function generateImage(apiKey: string, prompt: string) {
@@ -98,9 +48,8 @@ async function generateImage(apiKey: string, prompt: string) {
   });
 
   if (!response.ok) {
-    throw new OpenAIRequestError(
+    throw new Error(
       await openAIErrorMessage(response, `OpenAI image generation returned ${response.status}`),
-      response.status,
     );
   }
   const data = (await response.json()) as { data: { b64_json: string }[] };
@@ -109,9 +58,15 @@ async function generateImage(apiKey: string, prompt: string) {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    return NextResponse.json({ error: "OpenAI API key is not configured." }, { status: 503 });
+  const openAIKey = process.env.OPENAI_API_KEY?.trim();
+  if (!openAIKey && !process.env.GITHUB_MODELS_TOKEN?.trim() && !process.env.ANTHROPIC_API_KEY?.trim()) {
+    return NextResponse.json(
+      {
+        error:
+          "AI API 키가 설정되지 않았습니다. OPENAI_API_KEY, GITHUB_MODELS_TOKEN, ANTHROPIC_API_KEY 중 하나 이상을 등록해 주세요.",
+      },
+      { status: 503 },
+    );
   }
 
   const body = (await request.json().catch(() => null)) as RequestBody | null;
@@ -145,14 +100,17 @@ export async function POST(request: Request) {
   ];
 
   try {
-    const [content, images] = await Promise.all([
-      generateContent(apiKey, textPrompt),
-      Promise.all(
-        imagePrompts
-          .slice(0, IMAGE_COUNT)
-          .map((prompt) => generateImage(apiKey, prompt).catch(() => null)),
-      ),
+    const [textResult, images] = await Promise.all([
+      generateTextWithFallback(ARTICLE_SYSTEM_PROMPT, textPrompt),
+      openAIKey
+        ? Promise.all(
+            imagePrompts
+              .slice(0, IMAGE_COUNT)
+              .map((prompt) => generateImage(openAIKey, prompt).catch(() => null)),
+          )
+        : Promise.resolve([] as (string | null)[]),
     ]);
+    const content = textResult.content;
 
     return NextResponse.json({
       title,

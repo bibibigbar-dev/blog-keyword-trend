@@ -14,13 +14,17 @@
 
 ## AI 본문·이미지 생성
 
-메인 화면에서 주제를 입력하거나 키워드 상세 화면에서 제목 템플릿을 클릭하면 OpenAI가 콘텐츠를 생성합니다. 각각 `/api/generate-topic`, `/api/generate-article` 경로에서 실행되며, Render 환경 변수에 다음 값을 등록해야 합니다.
+메인 화면에서 주제를 입력하거나 키워드 상세 화면에서 제목 템플릿을 클릭하면 AI가 콘텐츠를 생성합니다. 각각 `/api/generate-topic`, `/api/generate-article` 경로에서 실행됩니다. 텍스트 생성은 OpenAI → GitHub Models → Claude(Anthropic) 순서로 시도하며, 앞 단계가 실패하면 다음 제공자로 자동 전환합니다. 이미지 생성은 OpenAI(`dall-e-3`)만 지원하며, OpenAI가 실패해도 본문은 정상적으로 표시되고 이미지만 생략됩니다. Render 환경 변수에 다음 값을 등록해야 합니다.
 
-- `OPENAI_API_KEY` (필수)
+- `OPENAI_API_KEY` (OpenAI 사용 시 필수)
 - `OPENAI_TEXT_MODEL` (선택, 기본값 `gpt-4o-mini`)
 - `OPENAI_IMAGE_MODEL` (선택, 기본값 `dall-e-3`)
+- `GITHUB_MODELS_TOKEN` (GitHub Models 사용 시 필수, GitHub Personal Access Token)
+- `GITHUB_MODELS_MODEL` (선택, 기본값 `openai/gpt-4o-mini`)
+- `ANTHROPIC_API_KEY` (Claude 대체 사용 시 필수)
+- `ANTHROPIC_TEXT_MODEL` (선택, 기본값 `claude-3-5-haiku-latest`)
 
-키는 서버의 `/api/generate-article` 경로에서만 사용하며 브라우저에 노출되지 않습니다.
+세 키 중 하나 이상은 반드시 등록해야 하며, 여러 개를 등록하면 등록된 순서대로 자동 폴백됩니다. GitHub Models는 GitHub에서 발급한 Personal Access Token으로 무료(사용량 제한 있음)로 텍스트 생성을 호출할 수 있습니다. 키는 서버의 API 경로에서만 사용하며 브라우저에 노출되지 않습니다.
 
 > 같은 키를 다른 곳에서는 정상적으로 쓰고 있는데도 "API 키가 유효하지 않다"는 오류가 계속 발생한다면, Render 환경 변수 값에 앞뒤 공백이나 줄바꿈이 포함되지 않았는지, 그리고 해당 키에 이미지 생성(`dall-e-3`) 등 필요한 모델 권한이 있는지 확인해 주세요.
 
