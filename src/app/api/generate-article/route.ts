@@ -34,7 +34,7 @@ function articleErrorResponse(error: unknown) {
     if (error.status === 401 || error.status === 403) {
       return NextResponse.json(
         {
-          error: `OpenAI API 키가 유효하지 않거나 권한이 없습니다. Vercel의 OPENAI_API_KEY 값에 앞뒤 공백이나 줄바꿈이 포함되지 않았는지, 그리고 해당 키에 필요한 권한(모델/이미지 생성)이 있는지 확인해 주세요. (${error.message})`,
+          error: `OpenAI API 키가 유효하지 않거나 권한이 없습니다. 배포 환경의 OPENAI_API_KEY 값에 앞뒤 공백이나 줄바꿈이 포함되지 않았는지, 그리고 해당 키에 필요한 권한(모델/이미지 생성)이 있는지 확인해 주세요. (${error.message})`,
         },
         { status: 502 },
       );
